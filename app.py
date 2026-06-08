@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from pathlib import Path
 import os, csv, json, datetime, requests, html, uuid
+from execution.add_case_update import add_case_update as doe_add_case_update
 
 load_dotenv()
 
@@ -15,6 +16,7 @@ LOGS = BASE / "logs"
 DATA = BASE / "data"
 TIMELINE = DATA / "timeline.json"
 TASKS = DATA / "tasks.json"
+CASE_UPDATES = DATA / "case_updates.json"
 
 for p in [DRAFTS, LOGS, DATA]:
     p.mkdir(exist_ok=True)
@@ -128,6 +130,7 @@ def dashboard_html(message=""):
     contacts = load_contacts()
     timeline = load_json(TIMELINE, [])
     tasks = load_json(TASKS, [])
+    case_updates = load_json(CASE_UPDATES, [])
     drafts = sorted(DRAFTS.glob("*.txt"), key=lambda p: p.stat().st_mtime, reverse=True)
 
     media = sum(1 for c in contacts if c.get("Type") == "Media")
@@ -394,6 +397,7 @@ def add_timeline(
 @app.post("/add-task")
 def add_task(task: str = Form(""), priority: str = Form("high")):
     tasks = load_json(TASKS, [])
+    case_updates = load_json(CASE_UPDATES, [])
     tasks.append({"task": task, "owner": "Matthew", "status": "open", "priority": priority})
     save_json(TASKS, tasks)
     log_event("task_added", task)
@@ -405,3 +409,4 @@ def logs():
     if not path.exists():
         return "No logs yet."
     return path.read_text(encoding="utf-8")
+
