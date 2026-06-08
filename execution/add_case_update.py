@@ -10,8 +10,6 @@ DATA.mkdir(exist_ok=True)
 LOGS.mkdir(exist_ok=True)
 
 CASE_UPDATES = DATA / "case_updates.json"
-TIMELINE = DATA / "timeline.json"
-TASKS = DATA / "tasks.json"
 ACTIVITY_LOG = LOGS / "activity.log"
 
 def now():
@@ -39,21 +37,21 @@ def add_case_update(
     case_stage="Needs Review",
     date="unknown",
     time="unknown",
-    source="user",
+    source="dashboard",
     confidence="medium"
 ):
     updates = load_json(CASE_UPDATES, [])
 
     record = {
-        "id": f"case_update_{len(updates)+1}",
+        "id": f"case_update_{len(updates) + 1}",
         "created_at": now(),
-        "category": category,
-        "subcategory": subcategory,
-        "case_stage": case_stage,
-        "date": date,
-        "time": time,
-        "source": source,
-        "confidence": confidence,
+        "category": category or "New Information",
+        "subcategory": subcategory or "General Case Update",
+        "case_stage": case_stage or "Needs Review",
+        "date": date or "unknown",
+        "time": time or "unknown",
+        "source": source or "dashboard",
+        "confidence": confidence or "medium",
         "raw_text": raw_text,
         "timeline_impact": "needs review",
         "evidence_impact": "needs review",
@@ -69,9 +67,7 @@ def add_case_update(
     updates.append(record)
     save_json(CASE_UPDATES, updates)
     log_event("case_update_added", record["id"])
-
     return record
 
 if __name__ == "__main__":
-    print("James Law case update execution module is installed.")
-    print("Use add_case_update(raw_text='...') from Python to create structured case updates.")
+    print("add_case_update module OK")

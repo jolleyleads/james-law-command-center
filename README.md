@@ -58,3 +58,30 @@ That command routes work through:
 The wrapper is designed to categorize new case information, update timeline records, log evidence, identify contradictions, create follow-up actions, and prepare attorney, prosecutor, media, or legislative packets.
 
 Safety rule: this system creates drafts and structured records only. It does not automatically send emails or SMS.
+
+## MCP Case Files Strategy
+
+This repo now includes an MCP-style strategy directive for James Jolley Case Files.
+
+MCP is treated as the USB-C adapter layer for AI tools and data sources.
+DOE remains the discipline layer.
+
+Core rule:
+
+Load the smallest useful tool set for the case task.
+
+Files:
+
+- `directives/mcp_case_files_strategy.md`
+- `directives/case_workspace_wrapper.md`
+- `orchestration/orchestrator.md`
+- `execution/add_case_update.py`
+- `data/case_updates.json`
+
+The dashboard supports:
+
+- paste a case update
+- save structured case update records
+- show recent case updates
+- add timeline entries
+- add follow-up tasks
