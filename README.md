@@ -40,3 +40,21 @@ http://127.0.0.1:8000
 ## Render
 
 Push to GitHub, connect repo to Render, then deploy.
+
+## James Jolley Case Files Wrapper
+
+This repo now includes a DOE case-file wrapper layer.
+
+Core command:
+
+`Add this to James Jolley Case Files.`
+
+That command routes work through:
+
+- `directives/case_workspace_wrapper.md`
+- `orchestration/orchestrator.md`
+- `execution/add_case_update.py`
+
+The wrapper is designed to categorize new case information, update timeline records, log evidence, identify contradictions, create follow-up actions, and prepare attorney, prosecutor, media, or legislative packets.
+
+Safety rule: this system creates drafts and structured records only. It does not automatically send emails or SMS.
