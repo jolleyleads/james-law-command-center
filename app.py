@@ -1,64 +1,33 @@
-from flask import Flask, request, jsonify
+import os,json
 from datetime import datetime
-import json
-import os
+from flask import Flask,request,jsonify
 
-app = Flask(__name__)
+app=Flask(__name__)
+DB="case_updates.json"
 
-CASE_FILE_PATH = "james_jolley_case_updates.json"
+def load():
+    if not os.path.exists(DB): return []
+    try:
+        return json.load(open(DB,"r",encoding="utf-8"))
+    except:
+        return []
 
 @app.route("/")
 def home():
-    return "James Jolley Command Center is live."
+    items=load()
+    html="<h1>James Jolley Command Center</h1><h3>Status: LIVE</h3>"
+    for x in items[:50]:
+        html+=f"<hr><b>{x.get('subject','Case Update')}</b><br>{x.get('_received_at','')}<br>{x}"
+    return html
 
-@app.route("/api/case-update", methods=["POST"])
-def case_update():
-    try:
-        data = request.get_json(force=True)
+@app.route("/api/case-update",methods=["POST"])
+def update():
+    data=request.get_json(silent=True) or {}
+    items=load()
+    data["_received_at"]=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    items.insert(0,data)
+    json.dump(items,open(DB,"w",encoding="utf-8"),indent=2)
+    return jsonify({"success":True})
 
-        update = {
-            "received_at": datetime.utcnow().isoformat(),
-            "source": "make.com",
-            "case": data.get("case", "James Jolley Case Files"),
-            "category": data.get("category", "Uncategorized"),
-            "date": data.get("date", ""),
-            "people_involved": data.get("people_involved", []),
-            "agency_or_source": data.get("agency_or_source", ""),
-            "summary": data.get("summary", ""),
-            "timeline_entry": data.get("timeline_entry", ""),
-            "evidence_value": data.get("evidence_value", ""),
-            "contradictions": data.get("contradictions", []),
-            "follow_up_actions": data.get("follow_up_actions", []),
-            "priority": data.get("priority", "medium"),
-            "recommended_next_step": data.get("recommended_next_step", "")
-        }
-
-        existing = []
-
-        if os.path.exists(CASE_FILE_PATH):
-            with open(CASE_FILE_PATH, "r", encoding="utf-8") as f:
-                try:
-                    existing = json.load(f)
-                except:
-                    existing = []
-
-        existing.append(update)
-
-        with open(CASE_FILE_PATH, "w", encoding="utf-8") as f:
-            json.dump(existing, f, indent=2)
-
-        return jsonify({
-            "status": "success",
-            "message": "Case update received and saved",
-            "saved_update": update
-        }), 200
-
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__=="__main__":
+    app.run(host="0.0.0.0",port=int(os.environ.get("PORT",5000)))
