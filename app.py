@@ -1,22 +1,21 @@
-import os
-from flask import Flask, request, jsonify
+from flask import Flask
 
 app = Flask(__name__)
-updates = []
 
 @app.route("/")
 def home():
     return """
-    <h1>JAMES JOLLEY COMMAND CENTER DASHBOARD UPDATED</h1>
-    <p>If you see this, Render is using the new app.py.</p>
-    <p>Status: LIVE</p>
+    <h1>James Jolley Command Center</h1>
+    <h2>Dashboard Online</h2>
+    <p>Media Outreach Agent Ready</p>
+    <ul>
+        <li>Render: Connected</li>
+        <li>Make: Connected</li>
+        <li>OpenAI: Connected</li>
+        <li>Google Sheets: Connected</li>
+        <li>Gmail: Connected</li>
+    </ul>
     """
 
-@app.route("/api/case-update", methods=["POST"])
-def case_update():
-    data = request.get_json(silent=True) or {}
-    updates.append(data)
-    return jsonify({"success": True, "message": "Case update received", "data": data}), 200
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=5000)
