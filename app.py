@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from pathlib import Path
 import os, csv, json, datetime, requests, html, uuid
 from execution.add_case_update import add_case_update as doe_add_case_update
+from execution.make_payload import build_make_agent_payload, sample_payload
 
 load_dotenv()
 
@@ -485,11 +486,7 @@ def add_case_update_dashboard(
             confidence=confidence
         )
 
-        payload = {
-            "event": "case_update_added",
-            "record": record,
-            "timestamp": now()
-        }
+        payload = build_make_agent_payload(record)
 
         make_result = make_push(payload)
         log_event("case_update_dashboard_added", f"{record.get('id','unknown')} | Make: {make_result}")
@@ -500,6 +497,51 @@ def add_case_update_dashboard(
         log_event("case_update_dashboard_failed", str(e))
         return HTMLResponse(dashboard_html(f"Could not add case update: {str(e)}"))
 
+
+
+
+
+
+@app.get("/make-setup", response_class=HTMLResponse)
+def make_setup():
+    return """
+    <!doctype html>
+    <html>
+    <head>
+      <meta name='viewport' content='width=device-width, initial-scale=1'>
+      <title>Make AI Agent Setup</title>
+      <style>
+        body { font-family: Arial, sans-serif; background:#101318; color:#f5f5f5; padding:20px; }
+        pre { background:#1b2230; padding:15px; border-radius:10px; white-space:pre-wrap; }
+        a { color:#8db7ff; }
+      </style>
+    </head>
+    <body>
+      <h1>James Jolley Case Files — Make AI Agent Setup</h1>
+      <p>Use this dashboard with Make.com:</p>
+      <pre>Custom Webhook → AI Agent</pre>
+
+      <h2>Conversation ID</h2>
+      <pre>{{1.record.id}}</pre>
+
+      <h2>Agent Input</h2>
+      <pre>{{1}}</pre>
+
+      <h2>Required Render Environment Variable</h2>
+      <pre>MAKE_WEBHOOK_URL = your Make Custom Webhook URL</pre>
+
+      <h2>Test Payload</h2>
+      <p><a href='/make-test-payload'>Open /make-test-payload</a></p>
+
+      <h2>Automation Level</h2>
+      <pre>Level 2 only: log, classify, draft text, task text. Do not send email or SMS automatically.</pre>
+    </body>
+    </html>
+    """
+
+@app.get("/make-test-payload")
+def make_test_payload():
+    return sample_payload()
 
 @app.get("/logs", response_class=PlainTextResponse)
 def logs():

@@ -85,3 +85,58 @@ The dashboard supports:
 - show recent case updates
 - add timeline entries
 - add follow-up tasks
+
+## Make AI Agent DOE Integration
+
+This project now supports a Make.com AI Agent workflow.
+
+Flow:
+
+James Jolley Case Files Dashboard
+→ FastAPI `/add-case-update`
+→ `execution/add_case_update.py`
+→ `execution/make_payload.py`
+→ `MAKE_WEBHOOK_URL`
+→ Make.com Custom Webhook
+→ Make AI Agent
+→ structured DOE output
+
+Make setup:
+
+- Scenario name: `James Jolley Case Files DOE Agent`
+- First module: `Webhooks → Custom Webhook`
+- Second module: `AI Agent`
+- Conversation ID: `{{1.record.id}}`
+- Input: `{{1}}`
+
+Agent prompt file:
+
+- `docs/make_ai_agent_prompt_to_paste.txt`
+
+Directive:
+
+- `directives/make_ai_agent_doe_directive.md`
+
+Test endpoint:
+
+- `/make-test-payload`
+
+Setup helper page:
+
+- `/make-setup`
+
+Safety level:
+
+Level 2 automation only.
+
+Allowed:
+- log
+- classify
+- create draft text
+- create task text
+- create follow-up reminders
+
+Not allowed:
+- automatic email sending
+- automatic SMS sending
+- contacting detectives/prosecutors/courts/media/legislators automatically
