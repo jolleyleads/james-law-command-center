@@ -1,4 +1,4 @@
-# DOE James Jolley Command Center Flask app
+﻿# DOE James Jolley Command Center Flask app
 # Replace your repo's app.py with this file, commit, and Render will redeploy.
 
 import os
@@ -95,17 +95,170 @@ def route_case_update(db, record):
 def home():
     db=load_db()
     stats = {
-        "Media Contacts":len(db["media_contacts"]), "Case Updates":len(db["case_updates"]), "Evidence":len(db["evidence"]),
-        "Witnesses":len(db["witnesses"]), "Timeline":len(db["timeline"]), "Grand Jury":len(db["grand_jury"]),
-        "Court Events":len(db["court_events"]), "Follow-Ups":len(db["followups"])
+        "Media Contacts":len(db["media_contacts"]),
+        "Case Updates":len(db["case_updates"]),
+        "Evidence":len(db["evidence"]),
+        "Witnesses":len(db["witnesses"]),
+        "Timeline":len(db["timeline"]),
+        "Grand Jury":len(db["grand_jury"]),
+        "Court Events":len(db["court_events"]),
+        "Follow-Ups":len(db["followups"])
     }
-    html="<html><body style='font-family:Arial;background:#111;color:white;padding:25px'><h1>James Jolley Command Center</h1><h2>DOE Case Files Dashboard</h2>"
-    html += "".join(f"<p><b>{k}:</b> {v}</p>" for k,v in stats.items())
-    html += "<h3>Endpoints</h3><p>POST /api/case-update | /api/media-contact | /api/evidence | /api/timeline | /api/witness | /api/court-event | /api/grand-jury | /api/followup</p>"
-    html += "<h3>Recent Activity</h3>" + "".join(f"<p><b>{a.get('time','')}</b> - {a.get('message','')}</p>" for a in db["activity"][:30])
-    html += "</body></html>"
-    return html
 
+    def card(title, count, icon):
+        return f"""
+        <div class='stat-card'>
+            <div class='icon'>{icon}</div>
+            <div>
+                <div class='count'>{count}</div>
+                <div class='label'>{title}</div>
+            </div>
+        </div>
+        """
+
+    recent = ""
+    for a in db["activity"][:12]:
+        recent += f"<li><b>{a.get('time','')}</b><br>{a.get('message','')}</li>"
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<title>James Jolley Command Center</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {{
+    margin:0;
+    font-family:Arial, sans-serif;
+    background:#0b1020;
+    color:white;
+}}
+.header {{
+    padding:24px;
+    background:linear-gradient(135deg,#111827,#1e3a8a);
+}}
+.header h1 {{margin:0;font-size:28px;}}
+.header p {{margin:8px 0 0;color:#cbd5e1;}}
+.nav {{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    padding:16px 24px;
+    background:#111827;
+}}
+.nav a {{
+    color:white;
+    text-decoration:none;
+    background:#2563eb;
+    padding:10px 14px;
+    border-radius:8px;
+    font-weight:bold;
+}}
+.container {{padding:24px;}}
+.grid {{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:16px;
+}}
+.stat-card {{
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:14px;
+    padding:18px;
+    display:flex;
+    gap:14px;
+    align-items:center;
+}}
+.icon {{font-size:28px;}}
+.count {{font-size:28px;font-weight:bold;}}
+.label {{color:#cbd5e1;}}
+.section {{
+    margin-top:24px;
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:14px;
+    padding:18px;
+}}
+.buttons {{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:12px;
+}}
+.button {{
+    background:#1f2937;
+    border:1px solid #475569;
+    padding:14px;
+    border-radius:10px;
+    color:white;
+    text-decoration:none;
+    font-weight:bold;
+}}
+.green {{background:#166534;}}
+.gold {{background:#92400e;}}
+.red {{background:#7f1d1d;}}
+ul {{padding-left:20px;}}
+li {{margin-bottom:12px;color:#e5e7eb;}}
+.small {{color:#94a3b8;font-size:13px;}}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>James Jolley Command Center</h1>
+    <p>DOE Case Files + Media Outreach + Business CRM</p>
+</div>
+
+<div class="nav">
+    <a href="/">Dashboard</a>
+    <a href="/api/db">Database</a>
+    <a href="/api/report">Case Report</a>
+    <a href="/api/health">Health</a>
+</div>
+
+<div class="container">
+
+    <div class="grid">
+        {card("Media Contacts",stats["Media Contacts"],"📧")}
+        {card("Case Updates",stats["Case Updates"],"📝")}
+        {card("Evidence",stats["Evidence"],"📁")}
+        {card("Witnesses",stats["Witnesses"],"👥")}
+        {card("Timeline",stats["Timeline"],"🕒")}
+        {card("Grand Jury",stats["Grand Jury"],"⚖️")}
+        {card("Court Events",stats["Court Events"],"🏛️")}
+        {card("Follow-Ups",stats["Follow-Ups"],"✅")}
+    </div>
+
+    <div class="section">
+        <h2>Quick Actions</h2>
+        <div class="buttons">
+            <a class="button green" href="/api/media-contact">View Media Contacts</a>
+            <a class="button" href="/api/timeline">View Timeline</a>
+            <a class="button" href="/api/evidence">View Evidence</a>
+            <a class="button" href="/api/witness">View Witnesses</a>
+            <a class="button gold" href="/api/grand-jury">View Grand Jury</a>
+            <a class="button red" href="/api/followup">View Follow-Ups</a>
+        </div>
+        <p class="small">Add records through Make.com HTTP modules or direct API POST requests.</p>
+    </div>
+
+    <div class="section">
+        <h2>System Status</h2>
+        <p>✅ Command Center API live</p>
+        <p>✅ Make.com connected</p>
+        <p>✅ Gmail draft automation working</p>
+        <p>✅ Iterator creates one draft per contact</p>
+    </div>
+
+    <div class="section">
+        <h2>Recent Activity</h2>
+        <ul>{recent}</ul>
+    </div>
+
+</div>
+</body>
+</html>
+"""
+    return html
 @app.route("/api/health")
 def health(): return jsonify({"success":True,"time":now()})
 @app.route("/api/db")
@@ -155,3 +308,4 @@ def email_sent():
 
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
+
