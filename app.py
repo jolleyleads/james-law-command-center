@@ -302,10 +302,50 @@ def media_contact():
         db["media_contacts"].insert(0,rec); db["contacts"].insert(0,rec); saved.append(rec)
     add_activity(db,f"Media contacts added: {len(saved)}"); save_db(db); return jsonify({"success":True,"count":len(saved),"records":saved})
 
+
+@app.route("/api/update-media-contact", methods=["POST"])
+def update_media_contact():
+    db = load_db()
+    data = request.get_json(silent=True) or {}
+
+    email = data.get("email", "").strip().lower()
+    status = data.get("status", "Draft Created")
+    draft_id = data.get("draft_id", "")
+    notes = data.get("notes", "")
+
+    if not email:
+        return jsonify({"success": False, "error": "email required"}), 400
+
+    updated = 0
+
+    for contact in db.get("media_contacts", []):
+        if contact.get("email", "").strip().lower() == email:
+            contact["status"] = status
+            contact["draft_created_at"] = now()
+            if draft_id:
+                contact["draft_id"] = draft_id
+            if notes:
+                contact["notes"] = notes
+            updated += 1
+
+    for contact in db.get("contacts", []):
+        if contact.get("email", "").strip().lower() == email:
+            contact["status"] = status
+            contact["draft_created_at"] = now()
+            if draft_id:
+                contact["draft_id"] = draft_id
+            if notes:
+                contact["notes"] = notes
+
+    add_activity(db, f"Media contact marked {status}: {email}")
+    save_db(db)
+
+    return jsonify({"success": True, "updated": updated, "email": email, "status": status}), 200
 @app.route("/api/email-sent", methods=["POST"])
 def email_sent():
     db=load_db(); rec=clean(request.get_json(silent=True) or {},"Media Coverage","email"); db["emails"].insert(0,rec); add_activity(db,"Email activity logged"); save_db(db); return jsonify({"success":True,"record":rec})
 
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
+
 
