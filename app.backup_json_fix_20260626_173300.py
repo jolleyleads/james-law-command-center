@@ -395,12 +395,7 @@ User request:
 
         response = client.responses.create(
             model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
-            input=prompt,
-            text={
-                "format": {
-                    "type": "json_object"
-                }
-            }
+            input=prompt
         )
 
         raw = response.output_text.strip()
@@ -423,7 +418,6 @@ User request:
 
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
-
 
 
 
