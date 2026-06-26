@@ -1,4 +1,4 @@
-﻿# DOE James Jolley Command Center Flask app
+# DOE James Jolley Command Center Flask app
 # Replace your repo's app.py with this file, commit, and Render will redeploy.
 
 import os
@@ -222,14 +222,14 @@ li {{margin-bottom:12px;color:#e5e7eb;}}
 <div class="container">
 
     <div class="grid">
-        {card("Media Contacts",stats["Media Contacts"],"📧")}
-        {card("Case Updates",stats["Case Updates"],"📝")}
-        {card("Evidence",stats["Evidence"],"📁")}
-        {card("Witnesses",stats["Witnesses"],"👥")}
-        {card("Timeline",stats["Timeline"],"🕒")}
-        {card("Grand Jury",stats["Grand Jury"],"⚖️")}
-        {card("Court Events",stats["Court Events"],"🏛️")}
-        {card("Follow-Ups",stats["Follow-Ups"],"✅")}
+        {card("Media Contacts",stats["Media Contacts"],"??")}
+        {card("Case Updates",stats["Case Updates"],"??")}
+        {card("Evidence",stats["Evidence"],"??")}
+        {card("Witnesses",stats["Witnesses"],"??")}
+        {card("Timeline",stats["Timeline"],"??")}
+        {card("Grand Jury",stats["Grand Jury"],"??")}
+        {card("Court Events",stats["Court Events"],"???")}
+        {card("Follow-Ups",stats["Follow-Ups"],"?")}
     </div>
 
     <div class="section">
@@ -247,10 +247,10 @@ li {{margin-bottom:12px;color:#e5e7eb;}}
 
     <div class="section">
         <h2>System Status</h2>
-        <p>✅ Command Center API live</p>
-        <p>✅ Make.com connected</p>
-        <p>✅ Gmail draft automation working</p>
-        <p>✅ Iterator creates one draft per contact</p>
+        <p>? Command Center API live</p>
+        <p>? Make.com connected</p>
+        <p>? Gmail draft automation working</p>
+        <p>? Iterator creates one draft per contact</p>
     </div>
 
     <div class="section">
@@ -546,7 +546,7 @@ def remember_ai_interaction(user_request, payload, make_ok=True, status_code=200
     memory = load_ai_memory()
     items = memory.get("items", [])
     items.append({
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
         "request": user_request,
         "payload": payload,
         "make_ok": bool(make_ok),
