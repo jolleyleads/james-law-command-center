@@ -403,7 +403,7 @@ Rules:
 - Do not invent email addresses or phone numbers.
 - DesiredAction should be a short instruction for the outreach draft.
 
-Current user request:
+Current Current user request:
 {user_request}
 """
 
@@ -495,6 +495,16 @@ async function sendAiIntake() {
 # AI HOMEPAGE CHAT INJECTOR END
 
 
+
+
+@app.route("/ai-memory", methods=["GET", "DELETE"])
+def ai_memory():
+    if request.method == "DELETE":
+        save_ai_memory({"items": []})
+        return jsonify({"ok": True, "message": "AI memory cleared"})
+    return jsonify({"ok": True, "memory": load_ai_memory()})
+
+
 # AI CONVERSATION MEMORY START
 MEMORY_FILE = Path("data") / "ai_conversation_memory.json"
 
@@ -545,16 +555,9 @@ def remember_ai_interaction(user_request, payload, make_ok=True, status_code=200
     save_ai_memory(memory)
 # AI CONVERSATION MEMORY END
 
-
-@app.route("/ai-memory", methods=["GET", "DELETE"])
-def ai_memory():
-    if request.method == "DELETE":
-        save_ai_memory({"items": []})
-        return jsonify({"ok": True, "message": "AI memory cleared"})
-    return jsonify({"ok": True, "memory": load_ai_memory()})
-
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
+
 
 
 
