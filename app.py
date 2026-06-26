@@ -421,8 +421,68 @@ User request:
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
+
+# AI HOMEPAGE CHAT INJECTOR START
+@app.after_request
+def inject_ai_chat_widget(response):
+    try:
+        if request.path == "/" and response.status_code == 200 and "text/html" in response.content_type:
+            html = response.get_data(as_text=True)
+
+            if "AI Outreach Intake" not in html and "</body>" in html:
+                chat_html = """
+<div class="section">
+    <h2>AI Outreach Intake</h2>
+    <p>Type your outreach request below. This sends it through AI Intake, Make.com, Google Sheets, and Gmail Drafts.</p>
+
+    <textarea id="aiRequest" style="width:100%;min-height:125px;border-radius:10px;padding:12px;font-size:15px;" placeholder="Example: Add outreach for CNN at tips@cnn.com about James Michael Jolley. Type: Media. Priority: High."></textarea>
+
+    <br><br>
+    <button class="button green" onclick="sendAiIntake()">Send to AI Intake</button>
+
+    <pre id="aiResult" style="margin-top:15px;white-space:pre-wrap;background:#111827;color:#e5e7eb;padding:12px;border-radius:10px;display:none;"></pre>
+</div>
+
+<script>
+async function sendAiIntake() {
+    const request = document.getElementById("aiRequest").value.trim();
+    const resultBox = document.getElementById("aiResult");
+
+    resultBox.style.display = "block";
+
+    if (!request) {
+        resultBox.textContent = "Please type an outreach request first.";
+        return;
+    }
+
+    resultBox.textContent = "Sending to AI Intake...";
+
+    try {
+        const response = await fetch("/ai-intake", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({request: request})
+        });
+
+        const data = await response.json();
+        resultBox.textContent = JSON.stringify(data, null, 2);
+    } catch (err) {
+        resultBox.textContent = "Error: " + err.message;
+    }
+}
+</script>
+"""
+                html = html.replace("</body>", chat_html + "\n</body>")
+                response.set_data(html)
+
+        return response
+    except Exception:
+        return response
+# AI HOMEPAGE CHAT INJECTOR END
+
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
+
 
 
 
