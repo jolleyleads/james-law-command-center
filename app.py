@@ -424,6 +424,7 @@ Current Current user request:
         payload.setdefault("Source", "Command Center AI Intake")
 
         make_response = requests.post(make_webhook_url, json=payload, timeout=20)
+        remember_ai_interaction(user_request, payload, make_response.ok, make_response.status_code)
 
         return jsonify({
             "ok": make_response.ok,
@@ -557,6 +558,7 @@ def remember_ai_interaction(user_request, payload, make_ok=True, status_code=200
 
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
+
 
 
 
