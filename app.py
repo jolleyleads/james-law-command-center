@@ -252,47 +252,6 @@ li {{margin-bottom:12px;color:#e5e7eb;}}
         <p>✅ Iterator creates one draft per contact</p>
     </div>
 
-            <div class="section">
-            <h2>AI Outreach Intake</h2>
-            <p>Type a plain-English outreach request. The Command Center will send it through AI Intake, Make.com, Google Sheets, and Gmail Drafts.</p>
-
-            <textarea id="aiRequest" style="width:100%;min-height:120px;border-radius:10px;padding:12px;font-size:15px;" placeholder="Example: Add outreach for CNN at tips@cnn.com about James Michael Jolley. Type: Media. Priority: High."></textarea>
-
-            <br><br>
-            <button class="button green" onclick="sendAiIntake()">Send to AI Intake</button>
-
-            <pre id="aiResult" style="margin-top:15px;white-space:pre-wrap;background:#111827;color:#e5e7eb;padding:12px;border-radius:10px;display:none;"></pre>
-        </div>
-
-        <script>
-        async function sendAiIntake() {
-            const request = document.getElementById("aiRequest").value.trim();
-            const resultBox = document.getElementById("aiResult");
-
-            resultBox.style.display = "block";
-
-            if (!request) {
-                resultBox.textContent = "Please type an outreach request first.";
-                return;
-            }
-
-            resultBox.textContent = "Sending to AI Intake...";
-
-            try {
-                const response = await fetch("/ai-intake", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({request})
-                });
-
-                const data = await response.json();
-                resultBox.textContent = JSON.stringify(data, null, 2);
-            } catch (err) {
-                resultBox.textContent = "Error: " + err.message;
-            }
-        }
-        </script>
-
     <div class="section">
         <h2>Recent Activity</h2>
         <ul>{recent}</ul>
@@ -464,7 +423,6 @@ User request:
 
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
-
 
 
 
