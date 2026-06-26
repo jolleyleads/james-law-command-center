@@ -2,6 +2,7 @@
 # Replace your repo's app.py with this file, commit, and Render will redeploy.
 
 import os
+from pathlib import Path
 import json
 import requests
 from openai import OpenAI
@@ -361,6 +362,7 @@ def ai_intake():
 
         data = request.get_json(silent=True) or {}
         user_request = (data.get("request") or data.get("message") or "").strip()
+        memory_context = summarize_ai_memory()
 
         if not user_request:
             return jsonify({"ok": False, "error": "Missing request text"}), 400
@@ -376,7 +378,19 @@ def ai_intake():
         client = OpenAI(api_key=api_key)
 
         prompt = f"""
-Extract an outreach contact/action from this request.
+You are the AI command console for the James Law Command Center.
+
+Use recent memory to understand references like:
+- "the last one"
+- "same email as yesterday"
+- "more reporters like that"
+- "follow up with everyone who has not replied"
+- "use the same angle but target legislators"
+
+Recent command memory:
+{memory_context}
+
+Extract an outreach contact/action from the current request.
 
 Return ONLY valid JSON with these keys:
 Name, Organization, Type, Email, Phone, Notes, Priority, Status, DesiredAction
@@ -389,7 +403,7 @@ Rules:
 - Do not invent email addresses or phone numbers.
 - DesiredAction should be a short instruction for the outreach draft.
 
-User request:
+Current user request:
 {user_request}
 """
 
@@ -480,8 +494,68 @@ async function sendAiIntake() {
         return response
 # AI HOMEPAGE CHAT INJECTOR END
 
+
+# AI CONVERSATION MEMORY START
+MEMORY_FILE = Path("data") / "ai_conversation_memory.json"
+
+def load_ai_memory():
+    try:
+        MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if MEMORY_FILE.exists():
+            return json.loads(MEMORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {"items": []}
+
+def save_ai_memory(memory):
+    try:
+        MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        MEMORY_FILE.write_text(json.dumps(memory, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+def summarize_ai_memory(limit=10):
+    memory = load_ai_memory()
+    items = memory.get("items", [])[-limit:]
+    if not items:
+        return "No prior outreach memory yet."
+
+    lines = []
+    for item in items:
+        payload = item.get("payload", {})
+        lines.append(
+            f"- {item.get('timestamp','')} | Request: {item.get('request','')} | "
+            f"Name: {payload.get('Name','')} | Org: {payload.get('Organization','')} | "
+            f"Type: {payload.get('Type','')} | Email: {payload.get('Email','')} | "
+            f"Priority: {payload.get('Priority','')} | DesiredAction: {payload.get('DesiredAction','')}"
+        )
+    return "\n".join(lines)
+
+def remember_ai_interaction(user_request, payload, make_ok=True, status_code=200):
+    memory = load_ai_memory()
+    items = memory.get("items", [])
+    items.append({
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "request": user_request,
+        "payload": payload,
+        "make_ok": bool(make_ok),
+        "status_code": status_code
+    })
+    memory["items"] = items[-50:]
+    save_ai_memory(memory)
+# AI CONVERSATION MEMORY END
+
+
+@app.route("/ai-memory", methods=["GET", "DELETE"])
+def ai_memory():
+    if request.method == "DELETE":
+        save_ai_memory({"items": []})
+        return jsonify({"ok": True, "message": "AI memory cleared"})
+    return jsonify({"ok": True, "memory": load_ai_memory()})
+
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
+
 
 
 
