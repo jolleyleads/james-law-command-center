@@ -348,17 +348,18 @@ def update_media_contact():
 def email_sent():
     db=load_db(); rec=clean(request.get_json(silent=True) or {},"Media Coverage","email"); db["emails"].insert(0,rec); add_activity(db,"Email activity logged"); save_db(db); return jsonify({"success":True,"record":rec})
 
+if __name__ == "__main__":
+    port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
 
-@app.route("/ai-intake", methods=["GET", "POST"])
+
+@app.route("/ai-intake", methods=["POST"])
 def ai_intake():
+    """
+    Plain-English outreach intake.
+    Takes a user's request, extracts structured outreach fields with OpenAI,
+    then posts the same structured payload to the existing Make webhook.
+    """
     try:
-        if request.method == "GET":
-            return jsonify({
-                "ok": True,
-                "route": "/ai-intake",
-                "message": "AI intake endpoint is live. Send POST JSON with a request field."
-            })
-
         data = request.get_json(silent=True) or {}
         user_request = (data.get("request") or data.get("message") or "").strip()
 
@@ -369,11 +370,7 @@ def ai_intake():
         if not make_webhook_url:
             return jsonify({"ok": False, "error": "Missing MAKE_WEBHOOK_URL environment variable"}), 500
 
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            return jsonify({"ok": False, "error": "Missing OPENAI_API_KEY environment variable"}), 500
-
-        client = OpenAI(api_key=api_key)
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         prompt = f"""
 Extract an outreach contact/action from this request.
@@ -387,6 +384,7 @@ Rules:
 - Priority should be High, Medium, or Low.
 - If something is unknown, use an empty string.
 - Do not invent email addresses or phone numbers.
+- Notes should mention James Michael Jolley only if relevant.
 - DesiredAction should be a short instruction for the outreach draft.
 
 User request:
@@ -394,12 +392,16 @@ User request:
 """
 
         response = client.responses.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+            model=os.getenv("OPENAI_MODEL", "gpt-5.5"),
             input=prompt
         )
 
         raw = response.output_text.strip()
-        payload = json.loads(raw)
+
+        try:
+            payload = json.loads(raw)
+        except Exception:
+            return jsonify({"ok": False, "error": "AI did not return valid JSON", "raw": raw}), 500
 
         payload.setdefault("Status", "Ready")
         payload.setdefault("Source", "Command Center AI Intake")
@@ -411,13 +413,9 @@ User request:
             "status_code": make_response.status_code,
             "payload_sent": payload,
             "make_response": make_response.text[:500]
-        }), 200 if make_response.ok else make_response.status_code
+        }), make_response.status_code if not make_response.ok else 200
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
-
-if __name__ == "__main__":
-    port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
-
 
 
