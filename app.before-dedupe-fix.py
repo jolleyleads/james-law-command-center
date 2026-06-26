@@ -3,9 +3,6 @@
 
 import os
 import json
-import requests
-from openai import OpenAI
-import json
 from datetime import datetime
 from uuid import uuid4
 from flask import Flask, request, jsonify
@@ -350,72 +347,5 @@ def email_sent():
 
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
-
-
-@app.route("/ai-intake", methods=["POST"])
-def ai_intake():
-    """
-    Plain-English outreach intake.
-    Takes a user's request, extracts structured outreach fields with OpenAI,
-    then posts the same structured payload to the existing Make webhook.
-    """
-    try:
-        data = request.get_json(silent=True) or {}
-        user_request = (data.get("request") or data.get("message") or "").strip()
-
-        if not user_request:
-            return jsonify({"ok": False, "error": "Missing request text"}), 400
-
-        make_webhook_url = os.getenv("MAKE_WEBHOOK_URL") or os.getenv("MAKE_OUTREACH_WEBHOOK_URL")
-        if not make_webhook_url:
-            return jsonify({"ok": False, "error": "Missing MAKE_WEBHOOK_URL environment variable"}), 500
-
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-        prompt = f"""
-Extract an outreach contact/action from this request.
-
-Return ONLY valid JSON with these keys:
-Name, Organization, Type, Email, Phone, Notes, Priority, Status, DesiredAction
-
-Rules:
-- Type must be one of: Media, Legislator, Attorney, Prosecutor, Detective, Advocate, Other.
-- Status should be Ready.
-- Priority should be High, Medium, or Low.
-- If something is unknown, use an empty string.
-- Do not invent email addresses or phone numbers.
-- Notes should mention James Michael Jolley only if relevant.
-- DesiredAction should be a short instruction for the outreach draft.
-
-User request:
-{user_request}
-"""
-
-        response = client.responses.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-5.5"),
-            input=prompt
-        )
-
-        raw = response.output_text.strip()
-
-        try:
-            payload = json.loads(raw)
-        except Exception:
-            return jsonify({"ok": False, "error": "AI did not return valid JSON", "raw": raw}), 500
-
-        payload.setdefault("Status", "Ready")
-        payload.setdefault("Source", "Command Center AI Intake")
-
-        make_response = requests.post(make_webhook_url, json=payload, timeout=20)
-
-        return jsonify({
-            "ok": make_response.ok,
-            "status_code": make_response.status_code,
-            "payload_sent": payload,
-            "make_response": make_response.text[:500]
-        }), make_response.status_code if not make_response.ok else 200
-
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
 
 
