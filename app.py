@@ -437,63 +437,6 @@ Current Current user request:
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-# AI HOMEPAGE CHAT INJECTOR START
-@app.after_request
-def inject_ai_chat_widget(response):
-    try:
-        if request.path == "/" and response.status_code == 200 and "text/html" in response.content_type:
-            html = response.get_data(as_text=True)
-
-            if "AI Outreach Intake" not in html and "</body>" in html:
-                chat_html = """
-<div class="section">
-    <h2>AI Outreach Intake</h2>
-    <p>Type your outreach request below. This sends it through AI Intake, Make.com, Google Sheets, and Gmail Drafts.</p>
-
-    <textarea id="aiRequest" style="width:100%;min-height:125px;border-radius:10px;padding:12px;font-size:15px;" placeholder="Example: Add outreach for CNN at tips@cnn.com about James Michael Jolley. Type: Media. Priority: High."></textarea>
-
-    <br><br>
-    <button class="button green" onclick="sendAiIntake()">Send to AI Intake</button>
-
-    <pre id="aiResult" style="margin-top:15px;white-space:pre-wrap;background:#111827;color:#e5e7eb;padding:12px;border-radius:10px;display:none;"></pre>
-</div>
-
-<script>
-async function sendAiIntake() {
-    const request = document.getElementById("aiRequest").value.trim();
-    const resultBox = document.getElementById("aiResult");
-
-    resultBox.style.display = "block";
-
-    if (!request) {
-        resultBox.textContent = "Please type an outreach request first.";
-        return;
-    }
-
-    resultBox.textContent = "Sending to AI Intake...";
-
-    try {
-        const response = await fetch("/ai-intake", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({request: request})
-        });
-
-        const data = await response.json();
-        resultBox.textContent = JSON.stringify(data, null, 2);
-    } catch (err) {
-        resultBox.textContent = "Error: " + err.message;
-    }
-}
-</script>
-"""
-                html = html.replace("</body>", chat_html + "\n</body>")
-                response.set_data(html)
-
-        return response
-    except Exception:
-        return response
-# AI HOMEPAGE CHAT INJECTOR END
 
 
 
@@ -555,6 +498,197 @@ def remember_ai_interaction(user_request, payload, make_ok=True, status_code=200
     memory["items"] = items[-50:]
     save_ai_memory(memory)
 # AI CONVERSATION MEMORY END
+
+
+
+# CLEAN HOMEPAGE CHAT AND SEARCH START
+@app.route("/site-search", methods=["GET", "POST"])
+def site_search():
+    try:
+        if request.method == "POST":
+            data = request.get_json(silent=True) or {}
+            q = (data.get("q") or data.get("query") or data.get("request") or "").strip()
+        else:
+            q = (request.args.get("q") or "").strip()
+
+        if not q:
+            return jsonify({"ok": False, "error": "Missing search query"}), 400
+
+        roots = ["data", "contacts", "docs", "directives", "execution", "orchestration"]
+        allowed = {".txt", ".md", ".json", ".csv", ".py", ".log"}
+        results = []
+
+        q_lower = q.lower()
+
+        for root in roots:
+            folder = Path(root)
+            if not folder.exists():
+                continue
+
+            for file in folder.rglob("*"):
+                if not file.is_file() or file.suffix.lower() not in allowed:
+                    continue
+
+                try:
+                    text = file.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    continue
+
+                if q_lower in text.lower() or q_lower in file.name.lower():
+                    lower = text.lower()
+                    idx = lower.find(q_lower)
+                    if idx < 0:
+                        idx = 0
+
+                    start = max(idx - 180, 0)
+                    end = min(idx + 420, len(text))
+                    snippet = text[start:end].replace("\n", " ").strip()
+
+                    results.append({
+                        "file": str(file),
+                        "snippet": snippet[:700]
+                    })
+
+                if len(results) >= 10:
+                    break
+
+            if len(results) >= 10:
+                break
+
+        return jsonify({
+            "ok": True,
+            "query": q,
+            "count": len(results),
+            "results": results
+        })
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.after_request
+def inject_clean_homepage_chat_and_search(response):
+    try:
+        if request.path == "/" and response.status_code == 200 and "text/html" in response.content_type:
+            html = response.get_data(as_text=True)
+
+            if "AI Outreach Command Box" not in html and "</body>" in html:
+                widget = """
+<div class="section" style="border:2px solid #16a34a;">
+    <h2>AI Outreach Command Box</h2>
+    <p>Type an outreach command. If Make accepts it, this will show a simple saved message instead of raw JSON.</p>
+
+    <textarea id="aiRequest" style="width:100%;min-height:120px;border-radius:10px;padding:12px;font-size:15px;" placeholder="Example: Create outreach for John Smith at john@example.com. Use the James Jolley Foundation Medicaid gap angle. Priority High."></textarea>
+
+    <br><br>
+    <button class="button green" onclick="sendAiIntakeClean()">Send Outreach Request</button>
+
+    <div id="aiFriendlyResult" style="margin-top:15px;background:#052e16;color:#dcfce7;padding:14px;border-radius:10px;display:none;font-weight:bold;"></div>
+    <pre id="aiRawResult" style="margin-top:10px;white-space:pre-wrap;background:#020617;color:#9ca3af;padding:12px;border-radius:10px;display:none;"></pre>
+</div>
+
+<div class="section" style="border:2px solid #2563eb;">
+    <h2>Case File Search</h2>
+    <p>Search your Command Center folders like data, contacts, docs, directives, execution, and orchestration.</p>
+
+    <textarea id="siteSearchQuery" style="width:100%;min-height:80px;border-radius:10px;padding:12px;font-size:15px;" placeholder="Example: Detective Jackson, CNN, Medicaid gap, grand jury, Savannah, timeline"></textarea>
+
+    <br><br>
+    <button class="button" onclick="searchSiteFiles()">Search Case Files</button>
+
+    <div id="siteSearchResult" style="margin-top:15px;background:#111827;color:#e5e7eb;padding:14px;border-radius:10px;display:none;"></div>
+</div>
+
+<script>
+async function sendAiIntakeClean() {
+    const request = document.getElementById("aiRequest").value.trim();
+    const friendly = document.getElementById("aiFriendlyResult");
+    const raw = document.getElementById("aiRawResult");
+
+    friendly.style.display = "block";
+    raw.style.display = "none";
+
+    if (!request) {
+        friendly.textContent = "Type an outreach request first.";
+        return;
+    }
+
+    friendly.textContent = "Sending request...";
+    try {
+        const response = await fetch("/ai-intake", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({request: request})
+        });
+
+        const data = await response.json();
+
+        if (data.ok === true) {
+            friendly.textContent = "✅ Request saved. Your automation accepted it and the draft workflow is running.";
+        } else {
+            friendly.textContent = "⚠️ Request received, but something needs attention.";
+            raw.style.display = "block";
+            raw.textContent = JSON.stringify(data, null, 2);
+        }
+    } catch (err) {
+        friendly.textContent = "❌ Error sending request: " + err.message;
+    }
+}
+
+async function searchSiteFiles() {
+    const q = document.getElementById("siteSearchQuery").value.trim();
+    const box = document.getElementById("siteSearchResult");
+    box.style.display = "block";
+
+    if (!q) {
+        box.textContent = "Type something to search first.";
+        return;
+    }
+
+    box.textContent = "Searching case files...";
+
+    try {
+        const response = await fetch("/site-search", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({q: q})
+        });
+
+        const data = await response.json();
+
+        if (!data.ok) {
+            box.textContent = "Search error: " + (data.error || "Unknown error");
+            return;
+        }
+
+        if (!data.results || data.results.length === 0) {
+            box.textContent = "No matching case files found for: " + q;
+            return;
+        }
+
+        let html = "<b>Found " + data.count + " result(s):</b><br><br>";
+        data.results.forEach((r, i) => {
+            html += "<div style='margin-bottom:14px;padding:10px;background:#020617;border-radius:8px;'>";
+            html += "<b>" + (i + 1) + ". " + r.file + "</b><br>";
+            html += "<span style='color:#d1d5db;'>" + r.snippet + "</span>";
+            html += "</div>";
+        });
+
+        box.innerHTML = html;
+    } catch (err) {
+        box.textContent = "Search failed: " + err.message;
+    }
+}
+</script>
+"""
+                html = html.replace("</body>", widget + "\n</body>")
+                response.set_data(html)
+
+        return response
+    except Exception:
+        return response
+# CLEAN HOMEPAGE CHAT AND SEARCH END
+
 
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
