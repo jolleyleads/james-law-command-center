@@ -771,6 +771,10 @@ def command_chat():
         if not user_request:
             return jsonify({"ok": False, "error": "Missing command text"}), 400
 
+        case_direct_answer = command_center_case_answer(user_request)
+        if case_direct_answer:
+            return jsonify({"ok": True, "answer": case_direct_answer, "results": []})
+
         results = command_center_internal_search(user_request)
 
         internal_context = ""
@@ -881,6 +885,213 @@ async function sendCommandChat() {
     except Exception:
         return response
 # COMMAND CENTER AI CHAT END
+
+
+
+
+# STRUCTURED CASE DATABASE START
+CASE_DB_FILE = Path("data") / "case_database.json"
+
+def default_case_database():
+    return {
+        "timeline": [
+            {
+                "date": "2026-06-04",
+                "type": "detective_contact",
+                "title": "Detective Jackson outreach logged",
+                "people": ["Detective Jackson"],
+                "summary": "Call/text/voicemail outreach to Detective Jackson logged as pending response.",
+                "source": "James Law automation log",
+                "confidence": "known"
+            },
+            {
+                "date": "2026-06-15",
+                "type": "prosecutor_outreach",
+                "title": "Requested meeting with Portsmouth Commonwealth's Attorney Office",
+                "people": ["Stephanie Morales", "Portsmouth Commonwealth's Attorney Office"],
+                "summary": "Called to request meeting with Commonwealth's Attorney Stephanie Morales. Staff took contact information.",
+                "source": "user case notes",
+                "confidence": "known"
+            },
+            {
+                "date": "2026-06-17",
+                "type": "prosecutor_contact",
+                "title": "Kenobia Davis returned call about case meeting",
+                "people": ["Kenobia Davis", "Joyce Meadows", "Detective Jackson", "Stephanie Morales"],
+                "summary": "Kenobia Davis called back. Plan discussed to set meeting the following week with Joyce Meadows, Detective Jackson, and possibly Stephanie Morales to review the case.",
+                "source": "user case notes",
+                "confidence": "known"
+            }
+        ],
+        "evidence": [
+            {
+                "id": "EV-001",
+                "type": "Phone Records",
+                "summary": "Call logs and extracted phone data related to James Michael Jolley case.",
+                "status": "tracked"
+            },
+            {
+                "id": "EV-002",
+                "type": "Facebook Messages",
+                "summary": "Messages referencing coded terms and later fentanyl-related language.",
+                "status": "tracked"
+            },
+            {
+                "id": "EV-003",
+                "type": "Ring Camera",
+                "summary": "Vehicle arrival/departure footage and related plate/car evidence.",
+                "status": "tracked"
+            },
+            {
+                "id": "EV-004",
+                "type": "Toxicology",
+                "summary": "Toxicology indicating fentanyl as cause of death.",
+                "status": "tracked"
+            }
+        ],
+        "witnesses": [
+            {
+                "name": "Savannah Berry",
+                "role": "Witness",
+                "relationship": "James's girlfriend",
+                "summary": "Reportedly on phone with James in real time when drugs were obtained.",
+                "status": "Needs follow-up"
+            },
+            {
+                "name": "Sam",
+                "role": "Witness",
+                "relationship": "Friend / minor witness",
+                "summary": "Reportedly had information related to planned sale/contact.",
+                "status": "Needs follow-up"
+            }
+        ],
+        "contacts": [
+            {
+                "name": "Detective Jackson",
+                "type": "Detective",
+                "organization": "Portsmouth Police / case detective",
+                "status": "Case contact"
+            },
+            {
+                "name": "Kenobia Davis",
+                "type": "Commonwealth Attorney Office",
+                "organization": "Portsmouth Commonwealth's Attorney Office",
+                "status": "Office administrator / scheduling contact"
+            },
+            {
+                "name": "Joyce Meadows",
+                "type": "Prosecutor",
+                "organization": "Portsmouth Commonwealth's Attorney Office",
+                "status": "Meeting participant / case review contact"
+            }
+        ],
+        "notes": [
+            {
+                "title": "James Jolley Foundation Mission",
+                "summary": "Foundation mission is to fund teens into rehab during Medicaid or insurance delay gaps, based on James Michael Jolley's case.",
+                "tags": ["foundation", "medicaid gap", "rehab", "teen overdose"]
+            },
+            {
+                "title": "Command Center Capability",
+                "summary": "Current site can accept outreach commands, route them through OpenAI, send structured data to Make, update Google Sheets, and trigger Gmail draft workflow.",
+                "tags": ["command center", "automation", "make", "gmail"]
+            }
+        ]
+    }
+
+def load_case_database():
+    CASE_DB_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not CASE_DB_FILE.exists():
+        db = default_case_database()
+        CASE_DB_FILE.write_text(json.dumps(db, indent=2), encoding="utf-8")
+        return db
+    try:
+        return json.loads(CASE_DB_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return default_case_database()
+
+def save_case_database(db):
+    CASE_DB_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CASE_DB_FILE.write_text(json.dumps(db, indent=2), encoding="utf-8")
+
+def search_case_database(query, max_results=15):
+    db = load_case_database()
+    q = (query or "").lower().strip()
+    results = []
+
+    if not q:
+        return results
+
+    for section, items in db.items():
+        if not isinstance(items, list):
+            continue
+
+        for item in items:
+            text = json.dumps(item, ensure_ascii=False).lower()
+            if q in text:
+                results.append({
+                    "section": section,
+                    "item": item
+                })
+
+            if len(results) >= max_results:
+                return results
+
+    return results
+
+@app.route("/case-data", methods=["GET"])
+def case_data():
+    return jsonify({"ok": True, "case_database": load_case_database()})
+
+@app.route("/case-add", methods=["POST"])
+def case_add():
+    try:
+        data = request.get_json(silent=True) or {}
+        section = (data.get("section") or "notes").strip()
+
+        if section not in ["timeline", "evidence", "witnesses", "contacts", "notes"]:
+            return jsonify({"ok": False, "error": "Invalid section"}), 400
+
+        item = data.get("item")
+        if not isinstance(item, dict):
+            item = {
+                "title": data.get("title", "Untitled note"),
+                "summary": data.get("summary", data.get("text", "")),
+                "tags": data.get("tags", [])
+            }
+
+        db = load_case_database()
+        db.setdefault(section, [])
+        db[section].append(item)
+        save_case_database(db)
+
+        return jsonify({"ok": True, "section": section, "item": item})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+# Upgrade command center search function if it exists
+def command_center_case_answer(user_request):
+    case_results = search_case_database(user_request)
+    if case_results:
+        lines = ["I found internal case database records matching your request:\n"]
+        for i, result in enumerate(case_results, 1):
+            lines.append(f"{i}. Section: {result['section']}")
+            item = result["item"]
+            if isinstance(item, dict):
+                title = item.get("title") or item.get("name") or item.get("type") or item.get("id") or "Record"
+                summary = item.get("summary") or item.get("status") or json.dumps(item, ensure_ascii=False)
+                lines.append(f"   Title/Name: {title}")
+                lines.append(f"   Summary: {summary}")
+                if item.get("date"):
+                    lines.append(f"   Date: {item.get('date')}")
+                if item.get("people"):
+                    lines.append(f"   People: {', '.join(item.get('people'))}")
+            lines.append("")
+        return "\n".join(lines)
+    return None
+
+# STRUCTURED CASE DATABASE END
 
 
 if __name__ == "__main__":
