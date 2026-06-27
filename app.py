@@ -95,3 +95,98 @@ def followup():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+
+# ===== UNIVERSAL CASE INTELLIGENCE UPGRADE =====
+
+SEARCH_TABLES = [
+    "media_contacts",
+    "case_updates",
+    "evidence",
+    "witnesses",
+    "timeline",
+    "grand_jury",
+    "court_events",
+    "follow_ups",
+    "law_enforcement_contacts",
+    "prosecutor_contacts",
+    "media_coverage",
+    "notes"
+]
+
+def universal_case_search(query):
+    results = []
+    q = query.lower()
+
+    for table in SEARCH_TABLES:
+        try:
+            rows = db.execute(f"SELECT * FROM {table}").fetchall()
+            for row in rows:
+                text = " ".join([str(v) for v in dict(row).values() if v is not None]).lower()
+                if q in text:
+                    results.append({
+                        "table": table,
+                        "record": dict(row)
+                    })
+        except Exception:
+            continue
+
+    return results
+
+
+@app.route("/api/ai/universal-search", methods=["POST"])
+def ai_universal_search():
+    data = request.get_json(force=True)
+    query = data.get("query", "")
+
+    results = universal_case_search(query)
+
+    if not results:
+        return jsonify({
+            "answer": f"No matching internal case files found for: {query}",
+            "results": []
+        })
+
+    return jsonify({
+        "answer": f"Found {len(results)} matching records across your Command Center.",
+        "results": results
+    })
+
+
+@app.route("/api/dashboard/intelligence", methods=["GET"])
+def dashboard_intelligence():
+    counts = {}
+
+    for table in SEARCH_TABLES:
+        try:
+            count = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            counts[table] = count
+        except Exception:
+            counts[table] = 0
+
+    return jsonify({
+        "status": "Case Intelligence Online",
+        "tables_scanned": SEARCH_TABLES,
+        "counts": counts
+    })
+
+
+@app.route("/api/case/report", methods=["GET"])
+def generate_case_report():
+    report = {}
+
+    for table in SEARCH_TABLES:
+        try:
+            rows = db.execute(f"SELECT * FROM {table}").fetchall()
+            report[table] = [dict(r) for r in rows]
+        except Exception:
+            report[table] = []
+
+    return jsonify({
+        "title": "James Jolley Master Case Report",
+        "victim": "James Michael Jolley",
+        "date_of_death": "October 11, 2025",
+        "sections": report
+    })
+
+# ===== END UNIVERSAL CASE INTELLIGENCE UPGRADE =====
