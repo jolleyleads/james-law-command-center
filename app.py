@@ -690,6 +690,199 @@ async function searchSiteFiles() {
 # CLEAN HOMEPAGE CHAT AND SEARCH END
 
 
+
+
+# COMMAND CENTER AI CHAT START
+COMMAND_CENTER_SYSTEM_PROMPT = """
+You are CommandCenter.AI, the integrated assistant for the user's private AI command center.
+
+Your job:
+- Understand natural language commands like ChatGPT.
+- Retrieve, summarize, and analyze internal data stored in this system.
+- Prioritize internal data first.
+- Never hallucinate.
+- Never use external internet unless explicitly instructed.
+- If information does not exist, say so clearly.
+- If multiple items match, ask which one the user wants.
+- Treat all user data as confidential.
+
+You can output plain text, bullets, tables, JSON, timelines, summaries, action plans, reports, and case-file formatting.
+
+Primary mission:
+Be the user's personal AI command center — retrieve, analyze, organize, and respond using ONLY internal data unless told otherwise.
+"""
+
+def command_center_internal_search(query, max_results=12):
+    roots = ["data", "contacts", "docs", "directives", "execution", "orchestration"]
+    allowed = {".txt", ".md", ".json", ".csv", ".py", ".log"}
+    results = []
+    q = (query or "").lower().strip()
+
+    if not q:
+        return results
+
+    for root in roots:
+        folder = Path(root)
+        if not folder.exists():
+            continue
+
+        for file in folder.rglob("*"):
+            if not file.is_file() or file.suffix.lower() not in allowed:
+                continue
+
+            try:
+                text = file.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+
+            haystack = (file.name + "\n" + text).lower()
+
+            if q in haystack:
+                idx = haystack.find(q)
+                idx = max(idx, 0)
+                start = max(idx - 250, 0)
+                end = min(idx + 750, len(text))
+                snippet = text[start:end].replace("\n", " ").strip()
+
+                results.append({
+                    "file": str(file),
+                    "snippet": snippet[:900]
+                })
+
+            if len(results) >= max_results:
+                return results
+
+    return results
+
+
+@app.route("/command-chat", methods=["GET", "POST"])
+def command_chat():
+    try:
+        if request.method == "GET":
+            return jsonify({
+                "ok": True,
+                "route": "/command-chat",
+                "message": "CommandCenter.AI chat is live."
+            })
+
+        data = request.get_json(silent=True) or {}
+        user_request = (data.get("request") or data.get("message") or data.get("q") or "").strip()
+
+        if not user_request:
+            return jsonify({"ok": False, "error": "Missing command text"}), 400
+
+        results = command_center_internal_search(user_request)
+
+        internal_context = ""
+        if results:
+            for i, r in enumerate(results, 1):
+                internal_context += f"\nRESULT {i}\nFILE: {r['file']}\nSNIPPET: {r['snippet']}\n"
+        else:
+            internal_context = "No exact internal file matches found."
+
+        api_key = os.getenv("OPENAI_API_KEY")
+
+        if not api_key:
+            return jsonify({
+                "ok": True,
+                "answer": "I searched the internal command center files. OpenAI is not available, so here are the raw internal search results.",
+                "results": results
+            })
+
+        client = OpenAI(api_key=api_key)
+
+        prompt = f"""
+{COMMAND_CENTER_SYSTEM_PROMPT}
+
+User command:
+{user_request}
+
+Internal search results:
+{internal_context}
+
+Answer clearly. If the internal data does not contain the answer, say that clearly. Do not invent facts.
+"""
+
+        response = client.responses.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+            input=prompt
+        )
+
+        answer = response.output_text.strip()
+
+        return jsonify({
+            "ok": True,
+            "answer": answer,
+            "results": results
+        })
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.after_request
+def inject_command_center_ai_chat(response):
+    try:
+        if request.path == "/" and response.status_code == 200 and "text/html" in response.content_type:
+            html = response.get_data(as_text=True)
+
+            if "CommandCenter.AI Chat" not in html and "</body>" in html:
+                widget = """
+<div class="section" style="border:2px solid #fbbf24;">
+    <h2>CommandCenter.AI Chat</h2>
+    <p>Ask about your internal case files, notes, logs, contacts, directives, timelines, and records.</p>
+
+    <textarea id="commandChatInput" style="width:100%;min-height:110px;border-radius:10px;padding:12px;font-size:15px;" placeholder="Example: Open my James Jolley case files and summarize what is inside."></textarea>
+
+    <br><br>
+    <button class="button gold" onclick="sendCommandChat()">Ask CommandCenter.AI</button>
+
+    <div id="commandChatAnswer" style="margin-top:15px;background:#111827;color:#e5e7eb;padding:14px;border-radius:10px;display:none;white-space:pre-wrap;"></div>
+</div>
+
+<script>
+async function sendCommandChat() {
+    const request = document.getElementById("commandChatInput").value.trim();
+    const box = document.getElementById("commandChatAnswer");
+
+    box.style.display = "block";
+
+    if (!request) {
+        box.textContent = "Type a command first.";
+        return;
+    }
+
+    box.textContent = "Searching internal command center data...";
+
+    try {
+        const response = await fetch("/command-chat", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({request: request})
+        });
+
+        const data = await response.json();
+
+        if (data.ok) {
+            box.textContent = data.answer || "Done.";
+        } else {
+            box.textContent = "Error: " + (data.error || "Unknown error");
+        }
+    } catch (err) {
+        box.textContent = "Error: " + err.message;
+    }
+}
+</script>
+"""
+                html = html.replace("</body>", widget + "\n</body>")
+                response.set_data(html)
+
+        return response
+    except Exception:
+        return response
+# COMMAND CENTER AI CHAT END
+
+
 if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
 
