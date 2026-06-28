@@ -1093,114 +1093,112 @@ def command_center_case_answer(user_request):
 
 # STRUCTURED CASE DATABASE END
 
-
-if __name__ == "__main__":
-<<<<<<< HEAD
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-
-# ===== UNIVERSAL CASE INTELLIGENCE UPGRADE =====
+# ===== UNIVERSAL CASE INTELLIGENCE UPGRADE - SAFE JSON VERSION =====
 
 SEARCH_TABLES = [
     "media_contacts",
+    "contacts",
     "case_updates",
     "evidence",
     "witnesses",
     "timeline",
     "grand_jury",
     "court_events",
-    "follow_ups",
+    "followups",
     "law_enforcement_contacts",
     "prosecutor_contacts",
-    "media_coverage",
+    "legal_questions",
+    "civil_case_information",
+    "contradictions",
     "notes"
 ]
 
-def universal_case_search(query):
-    results = []
-    q = query.lower()
+def _combined_sections():
+    main_db = load_db()
+    case_db = load_case_database()
+    combined = {}
 
-    for table in SEARCH_TABLES:
-        try:
-            rows = db.execute(f"SELECT * FROM {table}").fetchall()
-            for row in rows:
-                text = " ".join([str(v) for v in dict(row).values() if v is not None]).lower()
-                if q in text:
-                    results.append({
-                        "table": table,
-                        "record": dict(row)
-                    })
-        except Exception:
-            continue
+    for key in SEARCH_TABLES:
+        combined[key] = []
+
+        main_items = main_db.get(key, [])
+        if isinstance(main_items, list):
+            combined[key].extend(main_items)
+
+        case_items = case_db.get(key, [])
+        if isinstance(case_items, list):
+            combined[key].extend(case_items)
+
+    return combined
+
+def universal_case_search(query):
+    q = (query or "").lower().strip()
+    if not q:
+        return []
+
+    results = []
+    sections = _combined_sections()
+
+    for section, rows in sections.items():
+        for row in rows:
+            text = json.dumps(row, ensure_ascii=False).lower()
+            if q in text:
+                results.append({
+                    "section": section,
+                    "record": row
+                })
+
+            if len(results) >= 50:
+                return results
 
     return results
 
-
 @app.route("/api/ai/universal-search", methods=["POST"])
 def ai_universal_search():
-    data = request.get_json(force=True)
-    query = data.get("query", "")
+    data = request.get_json(silent=True) or {}
+    query = data.get("query") or data.get("q") or data.get("request") or ""
 
     results = universal_case_search(query)
 
     if not results:
         return jsonify({
+            "ok": True,
             "answer": f"No matching internal case files found for: {query}",
             "results": []
         })
 
     return jsonify({
+        "ok": True,
         "answer": f"Found {len(results)} matching records across your Command Center.",
         "results": results
     })
 
-
 @app.route("/api/dashboard/intelligence", methods=["GET"])
 def dashboard_intelligence():
-    counts = {}
-
-    for table in SEARCH_TABLES:
-        try:
-            count = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            counts[table] = count
-        except Exception:
-            counts[table] = 0
+    sections = _combined_sections()
+    counts = {key: len(value) for key, value in sections.items()}
 
     return jsonify({
+        "ok": True,
         "status": "Case Intelligence Online",
-        "tables_scanned": SEARCH_TABLES,
+        "tables_scanned": list(sections.keys()),
         "counts": counts
     })
 
-
 @app.route("/api/case/report", methods=["GET"])
 def generate_case_report():
-    report = {}
-
-    for table in SEARCH_TABLES:
-        try:
-            rows = db.execute(f"SELECT * FROM {table}").fetchall()
-            report[table] = [dict(r) for r in rows]
-        except Exception:
-            report[table] = []
+    sections = _combined_sections()
 
     return jsonify({
+        "ok": True,
         "title": "James Jolley Master Case Report",
         "victim": "James Michael Jolley",
         "date_of_death": "October 11, 2025",
-        "sections": report
+        "sections": sections
     })
 
 # ===== END UNIVERSAL CASE INTELLIGENCE UPGRADE =====
-=======
-    port=int(os.environ.get("PORT",5000)); app.run(host="0.0.0.0", port=port)
 
-
-
-
-
-
-
-
->>>>>>> d8346e977913feaf42659e6eaa0bcc19da77d525
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

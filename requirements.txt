@@ -1,6 +1,6 @@
 flask
 uvicorn
 asgiref
-
 openai
 requests
+gunicorn
