@@ -1202,3 +1202,133 @@ def generate_case_report():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+
+# ===== AI OS SAFE UPGRADE =====
+
+from datetime import datetime
+import re
+
+AI_OS_TABLES = [
+    "media_contacts",
+    "case_updates",
+    "evidence",
+    "witnesses",
+    "timeline",
+    "grand_jury",
+    "court_events",
+    "follow_ups",
+    "law_enforcement_contacts",
+    "prosecutor_contacts",
+    "media_coverage",
+    "notes",
+    "documents"
+]
+
+def ai_os_rows(table):
+    try:
+        rows = db.execute(f"SELECT * FROM {table}").fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+def ai_os_all_data():
+    return {table: ai_os_rows(table) for table in AI_OS_TABLES}
+
+def ai_os_text(row):
+    return " ".join(str(v) for v in row.values() if v is not None).lower()
+
+def ai_os_search_records(query, limit=50):
+    q = query.lower()
+    words = [w for w in re.findall(r"[a-zA-Z0-9]+", q) if len(w) > 2]
+    results = []
+
+    for table, rows in ai_os_all_data().items():
+        for row in rows:
+            text = ai_os_text(row)
+            score = 0
+
+            if q in text:
+                score += 25
+
+            for word in words:
+                if word in text:
+                    score += 4
+
+            if "detective jackson" in q and ("jackson" in text or "detective" in text):
+                score += 20
+
+            if "grand jury" in q and ("grand jury" in text or "indict" in text):
+                score += 20
+
+            if "jessica" in q and "jessica" in text:
+                score += 20
+
+            if "savannah" in q and "savannah" in text:
+                score += 20
+
+            if score > 0:
+                results.append({"table": table, "score": score, "record": row})
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results[:limit]
+
+def ai_os_counts():
+    return {table: len(rows) for table, rows in ai_os_all_data().items()}
+
+@app.route("/api/ai-os/status", methods=["GET"])
+def ai_os_status():
+    return jsonify({
+        "status": "James Jolley AI OS Online",
+        "counts": ai_os_counts(),
+        "tables_scanned": AI_OS_TABLES
+    })
+
+@app.route("/api/ai-os/chat", methods=["POST"])
+def ai_os_chat():
+    data = request.get_json(force=True)
+    query = data.get("query", "")
+    results = ai_os_search_records(query)
+
+    if not results:
+        return jsonify({
+            "answer": "I searched all case tables, but no matching internal record was found.",
+            "query": query,
+            "results": []
+        })
+
+    return jsonify({
+        "answer": f"Found {len(results)} matching records across the Command Center.",
+        "query": query,
+        "results": results
+    })
+
+@app.route("/api/ai-os/dashboard", methods=["GET"])
+def ai_os_dashboard():
+    return jsonify({
+        "status": "Live AI Dashboard",
+        "counts": ai_os_counts()
+    })
+
+@app.route("/api/ai-os/person/<name>", methods=["GET"])
+def ai_os_person(name):
+    results = ai_os_search_records(name, limit=100)
+    return jsonify({
+        "person": name,
+        "total_matches": len(results),
+        "records": results
+    })
+
+@app.route("/api/ai-os/report", methods=["GET"])
+def ai_os_report():
+    data = ai_os_all_data()
+    return jsonify({
+        "title": "James Jolley Master AI Case Report",
+        "victim": "James Michael Jolley",
+        "date_of_death": "October 11, 2025",
+        "generated_at": datetime.now().isoformat(),
+        "sections": data,
+        "counts": ai_os_counts()
+    })
+
+# ===== END AI OS SAFE UPGRADE =====
