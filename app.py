@@ -1477,3 +1477,88 @@ def api_full_search():
     })
 
 # ===== END DOCUMENT INDEX + FULL CASE SEARCH UPGRADE =====
+
+
+# ===== MAKE INTAKE API FIX =====
+
+from datetime import datetime
+
+@app.route("/api/ai-os/status", methods=["GET"])
+def make_ai_os_status_fix():
+    return jsonify({
+        "status": "online",
+        "message": "James Jolley Command Center AI OS intake API is live"
+    })
+
+@app.route("/api/ai-os/intake", methods=["POST", "GET"])
+def make_ai_os_intake_fix():
+    if request.method == "GET":
+        return jsonify({
+            "status": "ready",
+            "message": "Use POST to send case records into the Command Center."
+        })
+
+    data = request.get_json(force=True, silent=True) or {}
+
+    date = data.get("date") or datetime.now().strftime("%Y-%m-%d")
+    source = data.get("source") or "Make.com Intake"
+    category = data.get("category") or "Timeline Event"
+    people = data.get("people_involved") or ""
+    summary = data.get("summary") or ""
+    supporting_evidence = data.get("supporting_evidence") or ""
+    open_questions = data.get("open_questions") or ""
+    importance = data.get("importance") or data.get("importance_level") or "Medium"
+    next_action = data.get("next_action") or ""
+
+    try:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS case_intake (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT,
+                source TEXT,
+                category TEXT,
+                people_involved TEXT,
+                summary TEXT,
+                supporting_evidence TEXT,
+                open_questions TEXT,
+                importance_level TEXT,
+                next_action TEXT,
+                created_at TEXT
+            )
+        """)
+
+        db.execute("""
+            INSERT INTO case_intake
+            (date, source, category, people_involved, summary, supporting_evidence,
+             open_questions, importance_level, next_action, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            date, source, category, people, summary, supporting_evidence,
+            open_questions, importance, next_action, datetime.now().isoformat()
+        ))
+
+        db.commit()
+
+        return jsonify({
+            "status": "saved",
+            "table": "case_intake",
+            "record": {
+                "date": date,
+                "source": source,
+                "category": category,
+                "people_involved": people,
+                "summary": summary,
+                "supporting_evidence": supporting_evidence,
+                "open_questions": open_questions,
+                "importance_level": importance,
+                "next_action": next_action
+            }
+        })
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+# ===== END MAKE INTAKE API FIX =====
