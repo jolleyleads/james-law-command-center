@@ -1332,3 +1332,148 @@ def ai_os_report():
     })
 
 # ===== END AI OS SAFE UPGRADE =====
+
+
+# ===== DOCUMENT INDEX + FULL CASE SEARCH UPGRADE =====
+
+from services.document_indexer import build_document_index, load_document_index, search_documents, score_text
+
+FULL_SEARCH_TABLES = [
+    "media_contacts",
+    "case_updates",
+    "evidence",
+    "witnesses",
+    "timeline",
+    "grand_jury",
+    "court_events",
+    "follow_ups",
+    "law_enforcement_contacts",
+    "prosecutor_contacts",
+    "media_coverage",
+    "notes",
+    "documents"
+]
+
+def db_rows_safe(table):
+    try:
+        rows = db.execute(f"SELECT * FROM {table}").fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+def search_database_records(query, limit=25):
+    results = []
+
+    for table in FULL_SEARCH_TABLES:
+        for row in db_rows_safe(table):
+            text = " ".join(str(v) for v in row.values() if v is not None)
+            score = score_text(query, text)
+
+            if score > 0:
+                results.append({
+                    "source_type": "database",
+                    "table": table,
+                    "score": score,
+                    "record": row
+                })
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results[:limit]
+
+def best_date_from_result(result):
+    if result.get("source_type") == "database":
+        r = result.get("record", {})
+        return r.get("date") or r.get("created_at") or r.get("event_date") or r.get("timestamp")
+
+    metadata = result.get("metadata", {})
+    dates = metadata.get("dates", [])
+    return dates[0] if dates else None
+
+def confidence_from_score(score):
+    if score >= 70:
+        return "High"
+    if score >= 35:
+        return "Medium"
+    return "Low"
+
+@app.route("/api/documents/index", methods=["GET"])
+def api_documents_index():
+    docs = load_document_index()
+    return jsonify({
+        "status": "loaded",
+        "count": len(docs),
+        "index_path": "data/document_index.json",
+        "documents": docs[:50]
+    })
+
+@app.route("/api/documents/reindex", methods=["POST"])
+def api_documents_reindex():
+    docs = build_document_index()
+    return jsonify({
+        "status": "reindexed",
+        "count": len(docs),
+        "index_path": "data/document_index.json"
+    })
+
+@app.route("/api/ai-os/document-status", methods=["GET"])
+def api_document_status():
+    docs = load_document_index()
+    files = sorted(list(set(d.get("file") for d in docs if d.get("file"))))
+
+    return jsonify({
+        "status": "document index online",
+        "indexed_chunks": len(docs),
+        "indexed_files": len(files),
+        "files": files[:200]
+    })
+
+@app.route("/api/ai-os/full-search", methods=["POST"])
+def api_full_search():
+    payload = request.get_json(force=True)
+    query = payload.get("query", "")
+
+    db_results = search_database_records(query, limit=25)
+    doc_results = search_documents(query, limit=25)
+
+    combined = db_results + doc_results
+    combined.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+    if not combined:
+        return jsonify({
+            "answer": "I searched both the database and local case files, but no matching internal record was found.",
+            "query": query,
+            "best_answer": None,
+            "confidence_level": "Low",
+            "database_results": [],
+            "document_results": [],
+            "supporting_records": []
+        })
+
+    best = combined[0]
+    best_date = best_date_from_result(best)
+    confidence = confidence_from_score(best.get("score", 0))
+
+    if best.get("source_type") == "document":
+        source = best.get("file")
+        preview = best.get("text_preview", "")
+    else:
+        source = best.get("table")
+        preview = str(best.get("record", ""))[:800]
+
+    return jsonify({
+        "answer": "I searched both your database and local case files. The strongest match is shown below.",
+        "query": query,
+        "best_answer": {
+            "source_type": best.get("source_type"),
+            "source": source,
+            "date_found": best_date,
+            "preview": preview,
+            "score": best.get("score")
+        },
+        "confidence_level": confidence,
+        "database_results": db_results,
+        "document_results": doc_results,
+        "supporting_records": combined[:15]
+    })
+
+# ===== END DOCUMENT INDEX + FULL CASE SEARCH UPGRADE =====
