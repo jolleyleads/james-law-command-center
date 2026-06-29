@@ -1199,6 +1199,73 @@ def generate_case_report():
 
 # ===== END UNIVERSAL CASE INTELLIGENCE UPGRADE =====
 
+
+
+# ===== HARD FIX LIVE MAKE INTAKE ROUTES =====
+
+@app.route("/api/ai-os/status", methods=["GET"])
+def hard_fix_ai_os_status():
+    return jsonify({
+        "status": "online",
+        "message": "AI OS intake API is live"
+    })
+
+@app.route("/api/ai-os/intake", methods=["GET", "POST"])
+def hard_fix_ai_os_intake():
+    from datetime import datetime
+
+    if request.method == "GET":
+        return jsonify({
+            "status": "ready",
+            "message": "Use POST to save case records."
+        })
+
+    data = request.get_json(force=True, silent=True) or {}
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS case_intake (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            source TEXT,
+            category TEXT,
+            people_involved TEXT,
+            summary TEXT,
+            supporting_evidence TEXT,
+            open_questions TEXT,
+            importance_level TEXT,
+            next_action TEXT,
+            created_at TEXT
+        )
+    """)
+
+    db.execute("""
+        INSERT INTO case_intake
+        (date, source, category, people_involved, summary, supporting_evidence,
+         open_questions, importance_level, next_action, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data.get("date") or datetime.now().strftime("%Y-%m-%d"),
+        data.get("source") or "Make.com Intake",
+        data.get("category") or "Timeline Event",
+        data.get("people_involved") or "",
+        data.get("summary") or "",
+        data.get("supporting_evidence") or "",
+        data.get("open_questions") or "",
+        data.get("importance") or "Medium",
+        data.get("next_action") or "",
+        datetime.now().isoformat()
+    ))
+
+    db.commit()
+
+    return jsonify({
+        "status": "saved",
+        "table": "case_intake"
+    })
+
+# ===== END HARD FIX LIVE MAKE INTAKE ROUTES =====
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
